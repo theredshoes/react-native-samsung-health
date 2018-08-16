@@ -11,7 +11,6 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.module.annotations.ReactModule;
@@ -54,7 +53,12 @@ public class SamsungHealthModule extends ReactContextBaseJavaModule implements
         LifecycleEventListener {
 
     private static final String REACT_MODULE = "RNSamsungHealth";
+
+    private static final String DURATION_SHORT_KEY = "SHORT";
+    private static final String DURATION_LONG_KEY = "LONG";
+
     public static final String STEP_DAILY_TREND_TYPE = "com.samsung.shealth.step_daily_trend";
+    public static final String HEALTH_DATA = "com.samsung.android.sdk.healthdata";
     public static final String DAY_TIME = "day_time";
 
     private HealthDataStore mStore;
@@ -74,15 +78,6 @@ public class SamsungHealthModule extends ReactContextBaseJavaModule implements
 
         getReactApplicationContext().addLifecycleEventListener(this);
         initSamsungHealth();
-    }
-
-    @Override
-    public Map<String, Object> getConstants() {
-        final Map<String, Object> constants = new HashMap<>();
-        constants.put("STEP_COUNT", HealthConstants.StepCount.HEALTH_DATA_TYPE);
-        constants.put("WEIGHT", HealthConstants.Weight.HEALTH_DATA_TYPE);
-        constants.put("STEP_DAILY_TREND", SamsungHealthModule.STEP_DAILY_TREND_TYPE);
-        return constants;
     }
 
     @Override
@@ -126,16 +121,10 @@ public class SamsungHealthModule extends ReactContextBaseJavaModule implements
     }
 
     @ReactMethod
-    public void connect(ReadableArray permissions, Callback error, Callback success)
+    public void connect(Callback error, Callback success)
     {
-        // Add permission
-        ConnectionListener listener = new ConnectionListener(this, error, success);
-        for (int i = 0; i < permissions.size(); i++) {
-            listener.addReadPermission(permissions.getString(i));
-        }
-
         // Create a HealthDataStore instance and set its listener
-        mStore = new HealthDataStore(getReactApplicationContext(), listener);
+        mStore = new HealthDataStore(getReactApplicationContext(), new ConnectionListener(this, error, success));
         // Request the connection to the health data store
         mStore.connectService();
     }
@@ -186,69 +175,54 @@ public class SamsungHealthModule extends ReactContextBaseJavaModule implements
         Log.d(REACT_MODULE, "startDate:" + Long.toString((long)startDate));
         Log.d(REACT_MODULE, "endDate:" + Long.toString((long)endDate));
 
-        /*
+
         Filter filter = Filter.and(
             Filter.greaterThanEquals(HealthConstants.StepCount.START_TIME, (long)startDate),
             Filter.lessThanEquals(HealthConstants.StepCount.START_TIME, (long)endDate)
         );
-        */
-        Filter filter = Filter.and(
-            Filter.greaterThanEquals(SamsungHealthModule.DAY_TIME, (long)startDate),
-            Filter.lessThanEquals(SamsungHealthModule.DAY_TIME, (long)endDate)
-        );
+
+//        Filter filter = Filter.and(
+//            Filter.greaterThanEquals(SamsungHealthModule.DAY_TIME, (long)startDate),
+//            Filter.lessThanEquals(SamsungHealthModule.DAY_TIME, (long)endDate)
+//        );
+        //  HealthDataResolver.ReadRequest request = new ReadRequest.Builder()
+        //     .setDataType(HealthConstants.Exercise.HEALTH_DATA_TYPE)
+        //     .setProperties(new String[]{
+        //             HealthConstants.Exercise.EXERCISE_TYPE,
+        //             HealthConstants.Exercise.DURATION,
+        //             HealthConstants.Exercise.MAX_SPEED,
+        //             HealthConstants.Exercise.MEAN_SPEED,
+        //     })
+        //     .setFilter(filter)
+        //     .build();
         HealthDataResolver.ReadRequest request = new ReadRequest.Builder()
-                /*
+
                 .setDataType(HealthConstants.StepCount.HEALTH_DATA_TYPE) //  "com.samsung.health.step_count"
                 .setProperties(new String[]{
                         HealthConstants.StepCount.COUNT,       // "count"
                         HealthConstants.StepCount.START_TIME,  // SessionMeasurement: "start_time"
                         HealthConstants.StepCount.TIME_OFFSET, // SessionMeasurement: "time_offset"
-                        HealthConstants.StepCount.DEVICE_UUID  // Common: "deviceuuid"
+                        HealthConstants.StepCount.DEVICE_UUID, // Common: "deviceuuid"
+                        HealthConstants.StepCount.DISTANCE
                 })
-                */
-                .setDataType(SamsungHealthModule.STEP_DAILY_TREND_TYPE) // "com.samsung.shealth.step_daily_trend"
+                /*
+                .setDataType(SamsungHealthModule.HEALTH_DATA) // "com.samsung.shealth.step_daily_trend"
                 .setProperties(new String[]{
                         HealthConstants.StepCount.COUNT,       // "count"
                         SamsungHealthModule.DAY_TIME,          // "day_time"
-                        HealthConstants.StepCount.DEVICE_UUID  // Common: "deviceuuid"
+                        HealthConstants.StepCount.DEVICE_UUID,  // Common: "deviceuuid"
+                        HealthConstants.StepCount.DISTANCE
                 })
+                */
                 .setFilter(filter)
                 .build();
-
+      
         try {
             resolver.read(request).setResultListener(new StepCountResultListener(this, error, success));
         } catch (Exception e) {
             Log.e(REACT_MODULE, e.getClass().getName() + " - " + e.getMessage());
             Log.e(REACT_MODULE, "Getting step count fails.");
             error.invoke("Getting step count fails.");
-        }
-    }
-
-    // Read the weight on demand
-    @ReactMethod
-    public void readWeight(double startDate, double endDate, Callback error, Callback success) {
-        HealthDataResolver resolver = new HealthDataResolver(mStore, null);
-        Filter filter = Filter.and(
-            Filter.greaterThanEquals(HealthConstants.Weight.START_TIME, (long)startDate),
-            Filter.lessThanEquals(HealthConstants.Weight.START_TIME, (long)endDate)
-        );
-        HealthDataResolver.ReadRequest request = new ReadRequest.Builder()
-                .setDataType(HealthConstants.Weight.HEALTH_DATA_TYPE) //  "com.samsung.health.weight"
-                .setProperties(new String[]{
-                        HealthConstants.Weight.WEIGHT,      // "weight"
-                        HealthConstants.Weight.START_TIME,  // DiscreteMeasurement: "start_time"
-                        HealthConstants.Weight.TIME_OFFSET, // DiscreteMeasurement: "time_offset"
-                        HealthConstants.Weight.DEVICE_UUID  // Common: "deviceuuid"
-                })
-                .setFilter(filter)
-                .build();
-
-        try {
-            resolver.read(request).setResultListener(new StepCountResultListener(this, error, success));
-        } catch (Exception e) {
-            Log.e(REACT_MODULE, e.getClass().getName() + " - " + e.getMessage());
-            Log.e(REACT_MODULE, "Getting weight fails.");
-            error.invoke("Getting weight fails.");
         }
     }
 }

@@ -1,4 +1,4 @@
-import {
+import { 
   NativeModules,
   DeviceEventEmitter
 } from 'react-native';
@@ -6,11 +6,13 @@ import {
 const samsungHealth = NativeModules.RNSamsungHealth;
 
 class RNSamsungHealth {
-  authorize(permissions, callback) {
+  constructor() {
+  }
+
+  authorize(callback) {
     samsungHealth.connect(
-      permissions,
       (msg) => { callback(msg, false); },
-      (res) => { callback(false, res); },
+      (res) => { callback(false, res); }
     );
   }
 
@@ -19,14 +21,16 @@ class RNSamsungHealth {
   }
 
   getDailyStepCountSamples(options, callback) {
-    let startDate = options.startDate != undefined ? Date.parse(options.startDate) : (new Date()).setHours(0,0,0,0);
-    let endDate = options.endDate != undefined ? Date.parse(options.endDate) : (new Date()).valueOf();
+    console.log("getDailyStepCounts");
+
+    let startDate = options.startDate != undefined ? options.startDate : (new Date()).setHours(0,0,0,0);
+    let endDate = options.endDate != undefined ? options.endDate : (new Date()).valueOf();
     let mergeData = options.mergeData != undefined ? options.mergeData : true;
 
-    //console.log("startDate:" + startDate);
-    //console.log("endDate:" + endDate);
-    //console.log("startDate2:" + (new Date(startDate)).toLocaleString());
-    //console.log("endDate2:" + (new Date(endDate)).toLocaleString());
+    // console.log("startDate:" + startDate);
+    // console.log("endDate:" + endDate);
+    // console.log("startDate2:" + (new Date(startDate)).toLocaleString());
+    // console.log("endDate2:" + (new Date(endDate)).toLocaleString());
 
     samsungHealth.readStepCount(startDate, endDate,
       (msg) => { callback(msg, false); },
@@ -35,7 +39,7 @@ class RNSamsungHealth {
               var resData = res.map(function(dev) {
                   var obj = {};
                   obj.source = dev.source.name;
-                  obj.steps = this.buildDailySteps(dev.data);
+                  obj.steps = this.buildDailySteps(dev.steps);
                   obj.sourceDetail = dev.source;
                   return obj;
                 }, this);
@@ -50,30 +54,16 @@ class RNSamsungHealth {
     );
   }
 
-  getWeightSamples(options, callback) {
-    console.log("getWeightSamples");
-
-    let startDate = options.startDate != undefined ? Date.parse(options.startDate) : (new Date()).setHours(0,0,0,0);
-    let endDate = options.endDate != undefined ? Date.parse(options.endDate) : (new Date()).valueOf();
-
-    samsungHealth.readWeight(startDate, endDate,
-      (msg) => { callback(msg, false); },
-      (res) => {
-        // TODO: processing some
-        console.log(res);
-        callback(false, res);
-      }
-    );
-  }
-
   usubscribeListeners() {
     DeviceEventEmitter.removeAllListeners();
   }
 
-  buildDailySteps(data)
+  buildDailySteps(steps)
   {
+          console.log(steps);
+
       results = {}
-      for(var step of data) {
+      for(var step of steps) {
           var date = step.start_time !== undefined ? new Date(step.start_time) : new Date(step.day_time);
 
           var day = ("0" + date.getDate()).slice(-2);
@@ -84,7 +74,8 @@ class RNSamsungHealth {
           if (!(dateFormatted in results)) {
               results[dateFormatted] = 0;
           }
-          results[dateFormatted] += step.count;
+
+          results[dateFormatted] += ((step.distance/1000)*0.6);
       }
 
       results2 = [];
@@ -136,12 +127,7 @@ class RNSamsungHealth {
 
       return results2;
   }
-}
 
-if (samsungHealth !== undefined) {
-  RNSamsungHealth.STEP_COUNT = samsungHealth.STEP_COUNT;
-  RNSamsungHealth.WEIGHT = samsungHealth.WEIGHT;
-  RNSamsungHealth.STEP_DAILY_TREND = samsungHealth.STEP_DAILY_TREND;
 }
 
 export default new RNSamsungHealth();

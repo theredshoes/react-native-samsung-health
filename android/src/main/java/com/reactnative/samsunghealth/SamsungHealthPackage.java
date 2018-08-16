@@ -32,8 +32,6 @@ public class SamsungHealthPackage implements ReactPackage {
         modules.add(new SamsungHealthModule(reactContext));
         return modules;
     }
-
-    @Override
     public List<Class<? extends JavaScriptModule>> createJSModules() {
         return Collections.emptyList();
     }
